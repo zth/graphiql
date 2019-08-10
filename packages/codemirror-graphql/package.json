@@ -47,7 +47,7 @@
     "chai": "4.1.1",
     "chai-subset": "1.5.0",
     "codemirror": "^5.28.0",
-    "graphql": "^14.0.2",
+    "graphql": "^14.5.3",
     "jsdom": "^11.2.0",
     "mocha": "3.5.0",
     "sane": "2.0.0"

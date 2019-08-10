@@ -1,10 +1,15 @@
 {
   "private": true,
   "license": "MIT",
-  "workspaces": [
-    "packages/*",
-    "packages/graphiql-examples/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "packages/graphiql-examples/*"
+    ],
+    "noHoist": [
+      "monaco-graphql"
+    ]
+  },
   "options": {
     "mocha": "--full-trace --require @babel/register --require resources/mochaBootload 'packages/{*,!graphiql}/src/**/__tests__/**/*-test.js'",
     "mocha_tdd": "--full-trace --watch --require resources/mochaBootload packages/*/src/**/__tests__/**/*-test.js"
@@ -53,6 +58,10 @@
     "graphql": "^14.3.1",
     "lerna": "^3.15.0",
     "mocha": "6.1.4",
-    "prettier": "^1.18.2"
+    "prettier": "^1.18.2",
+    "typescript": "^3.5.3"
+  },
+  "dependencies": {
+    "@types/graphql": "^14.5.0"
   }
 }

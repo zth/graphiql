@@ -1,0 +1,22 @@
+{
+  "name": "monaco-graphql",
+  "version": "0.0.1",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "graphql": "^14.5.3",
+    "graphql-language-service-interface": "^2.1.0",
+    "graphql-language-service-utils": "^2.1.0",
+    "whatwg-fetch": "^3.0.0"
+  },
+  "peerDependences": {
+    "monaco-editor": "^0.17.1"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^3.5.3"
+  }
+}

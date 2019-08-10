@@ -35,7 +35,7 @@ CodeMirror.registerHelper('lint', 'graphql', (text, options) => {
   const schema = options.schema;
   const rawResults = getDiagnostics(text, schema);
 
-  const results = rawResults.map(error => ({
+  const results = rawResults.map((error) => ({
     message: error.message,
     severity: SEVERITY[error.severity - 1],
     type: TYPE[error.source],

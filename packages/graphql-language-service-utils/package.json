@@ -20,6 +20,7 @@
     "graphql"
   ],
   "main": "dist/index.js",
+  "typings": "./index.d.ts",
   "scripts": {
     "test": "echo 'Please run `npm test` from the root of the repo' && exit 1",
     "build": "yarn run build-js && yarn run build-flow",

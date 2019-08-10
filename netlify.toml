@@ -1,3 +1,6 @@
 [build]
   command = "yarn && yarn build && lerna run setup"
   publish = "packages/graphiql-examples/cdn"
+
+[context.monaco-test]
+  publish = "packages/graphiql-examples/monaco-graphql-test/dist/bundle"
