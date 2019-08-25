@@ -113,8 +113,10 @@ export async function provideCompletionItems({
     // TODO: (optionally?) show all completion items at first?
     suggestions: suggestions.map(s => ({
       label: s.label,
+      kind: s.kind,
+      detail: s.detail,
+      documentation: s.documentation,
       insertText: s.label,
-      kind: 3,
     })),
   };
 }
