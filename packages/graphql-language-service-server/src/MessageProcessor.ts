@@ -5,10 +5,10 @@
  *  This source code is licensed under the license found in the
  *  LICENSE file in the root directory of this source tree.
  *
- *  @flow
+
  */
 
-import type {
+import {
   CachedContent,
   Diagnostic,
   DidChangeWatchedFilesParams,
@@ -45,12 +45,16 @@ import {
   InitializeResult,
   Location,
   PublishDiagnosticsParams,
+  TextDocument,
+  TextDocumentChangeEvent,
+  TextDocumentEdit,
 } from 'vscode-languageserver';
 
 import { getGraphQLCache } from './GraphQLCache';
 import { findGraphQLTags } from './findGraphQLTags';
 import { Logger } from './Logger';
 import { GraphQLWatchman } from './GraphQLWatchman';
+import { DocumentNode } from 'graphql';
 
 // Map { uri => { query, range } }
 
@@ -63,7 +67,7 @@ export class MessageProcessor {
   _graphQLCache: GraphQLCache;
   _languageService: GraphQLLanguageService;
   _textDocumentCache: Map<string, CachedDocumentType>;
-  _watchmanClient: ?GraphQLWatchman;
+  _watchmanClient: GraphQLWatchman;
 
   _isInitialized: boolean;
 
@@ -71,7 +75,7 @@ export class MessageProcessor {
 
   _logger: Logger;
 
-  constructor(logger: Logger, watchmanClient: GraphQLWatchman): void {
+  constructor(logger: Logger, watchmanClient: GraphQLWatchman) {
     this._textDocumentCache = new Map();
     this._isInitialized = false;
     this._willShutdown = false;
@@ -81,10 +85,10 @@ export class MessageProcessor {
   }
 
   async handleInitializeRequest(
-    params: InitializeRequest.type,
+    params: typeof InitializeRequest,
     token: CancellationToken,
     configDir?: string
-  ): Promise<InitializeResult.type> {
+  ): Promise<typeof InitializeResult> {
     if (!params) {
       throw new Error('`params` argument is required to initialize.');
     }
@@ -179,7 +183,7 @@ export class MessageProcessor {
   }
 
   async handleDidOpenOrSaveNotification(
-    params: NotificationMessage
+    params: { textDocument: TextDocument }
   ): Promise<PublishDiagnosticsParams> {
     if (!this._isInitialized) {
       return null;
@@ -238,7 +242,7 @@ export class MessageProcessor {
   }
 
   async handleDidChangeNotification(
-    params: NotificationMessage
+    params: TextDocumentEdit
   ): Promise<PublishDiagnosticsParams> {
     if (!this._isInitialized) {
       return null;
@@ -250,7 +254,7 @@ export class MessageProcessor {
     if (
       !params ||
       !params.textDocument ||
-      !params.contentChanges ||
+      !params.edits ||
       !params.textDocument.uri
     ) {
       throw new Error(
@@ -259,7 +263,7 @@ export class MessageProcessor {
     }
 
     const textDocument = params.textDocument;
-    const contentChanges = params.contentChanges;
+    const contentChanges = params.edits;
     const contentChange = contentChanges[contentChanges.length - 1];
 
     // As `contentChanges` is an array and we just want the
@@ -360,9 +364,9 @@ export class MessageProcessor {
   }
 
   async handleCompletionRequest(
-    params: CompletionRequest.type,
+    params: CompletionRequest,
     token: CancellationToken
-  ): Promise<CompletionList | Array<CompletionItem>> {
+  ): Promise<CompletionList | CompletionItem[]> {
     if (!this._isInitialized) {
       // $FlowFixMe
       return [];
@@ -418,7 +422,7 @@ export class MessageProcessor {
       })
     );
 
-    return { items: result, isIncomplete: false };
+    return result;t;
   }
 
   async handleHoverRequest(
@@ -469,7 +473,7 @@ export class MessageProcessor {
 
   async handleWatchedFilesChangedNotification(
     params: DidChangeWatchedFilesParams
-  ): Promise<PublishDiagnosticsParams> {
+  ): Promise<PublishDiagnosticsParams | null> {
     if (!this._isInitialized || this._watchmanClient) {
       return null;
     }
@@ -530,7 +534,7 @@ export class MessageProcessor {
   }
 
   async handleDefinitionRequest(
-    params: DefinitionRequest.type,
+    params: DefinitionRequest['type'],
     token: CancellationToken
   ): Promise<Array<Location>> {
     if (!this._isInitialized) {
@@ -634,7 +638,7 @@ export class MessageProcessor {
     );
   }
 
-  _getCachedDocument(uri: string): ?CachedDocumentType {
+  _getCachedDocument(uri: string): CachedDocumentType | null {
     if (this._textDocumentCache.has(uri)) {
       const cachedDocument = this._textDocumentCache.get(uri);
       if (cachedDocument) {
@@ -646,9 +650,9 @@ export class MessageProcessor {
   }
 
   _invalidateCache(
-    textDocument: Object,
+    textDocument: TextDocument,
     uri: Uri,
-    contents: Array<CachedContent>
+    contents: CachedContent[]
   ): void {
     if (this._textDocumentCache.has(uri)) {
       const cachedDocument = this._textDocumentCache.get(uri);
@@ -709,7 +713,7 @@ export function getQueryAndRange(
 function processDiagnosticsMessage(
   results: Array<Diagnostic>,
   query: string,
-  range: ?RangeType
+  range?: RangeType
 ): Array<Diagnostic> {
   const queryLines = query.split('\n');
   const totalLines = queryLines.length;

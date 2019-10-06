@@ -85,7 +85,7 @@ export interface GraphQLCache {
 
   getObjectTypeDependencies: (
     query: string,
-    fragmentDefinitions: Map<string, ObjectTypeInfo> | null | undefined,
+    fragmentDefinitions: Map<string, ObjectTypeInfo> | null | void,
   ) => Promise<Array<ObjectTypeInfo>>;
 
   getObjectTypeDependenciesForAST: (
@@ -101,17 +101,17 @@ export interface GraphQLCache {
     rootDir: Uri,
     filePath: Uri,
     contents: Array<CachedContent>,
-  ) => Promise<undefined>;
+  ) => Promise<void>;
 
   updateObjectTypeDefinitionCache: (
     rootDir: Uri,
     filePath: Uri,
     exists: boolean,
-  ) => Promise<undefined>;
+  ) => Promise<void>;
 
   getFragmentDependencies: (
     query: string,
-    fragmentDefinitions: Map<string, FragmentInfo> | null | undefined,
+    fragmentDefinitions: Map<string, FragmentInfo> | null | void,
   ) => Promise<Array<FragmentInfo>>;
 
   getFragmentDependenciesForAST: (
@@ -127,23 +127,23 @@ export interface GraphQLCache {
     rootDir: Uri,
     filePath: Uri,
     contents: Array<CachedContent>,
-  ) => Promise<undefined>;
+  ) => Promise<void>;
 
   updateFragmentDefinitionCache: (
     rootDir: Uri,
     filePath: Uri,
     exists: boolean,
-  ) => Promise<undefined>;
+  ) => Promise<void>;
 
   getSchema: (
-    appName: string | null | undefined,
-    queryHasExtensions?: boolean | null | undefined,
-  ) => Promise<GraphQLSchema | null | undefined>;
+    appName: string | null | void,
+    queryHasExtensions?: boolean | null | void,
+  ) => Promise<GraphQLSchema | null | void>;
 
   handleWatchmanSubscribeEvent: (
     rootDir: string,
     projectConfig: GraphQLProjectConfig,
-  ) => (result: Object) => undefined;
+  ) => (result: Object) => void;
 }
 
 // online-parser related

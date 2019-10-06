@@ -40,6 +40,9 @@
     "graphql-language-service-utils": "^2.3.0",
     "nullthrows": "^1.0.0",
     "vscode-jsonrpc": "^3.3.0",
-    "vscode-languageserver": "^3.3.0"
+    "vscode-languageserver": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/fb-watchman": "^2.0.0"
   }
 }

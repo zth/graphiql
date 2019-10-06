@@ -5,18 +5,19 @@
  *  This source code is licensed under the license found in the
  *  LICENSE file in the root directory of this source tree.
  *
- *  @flow
+
  */
 
 import { GraphQLSchema } from 'graphql/type';
-import { parse } from 'graphql/language';
+import { parse, DefinitionNode, DocumentNode } from 'graphql/language';
 import { getGraphQLConfig } from 'graphql-config';
 import fetchMock from 'fetch-mock';
 
 import { GraphQLCache } from '../GraphQLCache';
 import { getQueryAndRange } from '../MessageProcessor';
+import { Definition } from 'graphql-language-service-types/src/index.js.flow';
 
-function wihtoutASTNode(definition: object) {
+function wihtoutASTNode(definition: Definition) {
   const result = { ...definition };
   delete result.astNode;
   return result;

@@ -5,7 +5,7 @@
  *  This source code is licensed under the license found in the
  *  LICENSE file in the root directory of this source tree.
  *
- *  @flow
+
  */
 
 import { Position, Range } from 'graphql-language-service-utils';
@@ -151,7 +151,7 @@ describe('MessageProcessor', () => {
   }
   `;
 
-    const newDocument = {
+    const newDocument: NotificationMessage = {
       textDocument: {
         text: validQuery,
         uri: `${queryDir}/test3.graphql`,

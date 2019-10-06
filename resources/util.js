@@ -5,7 +5,7 @@
  *  This source code is licensed under the license found in the
  *  LICENSE file in the root directory of this source tree.
  *
- *  @flow
+
  */
 
 'use strict';
@@ -20,12 +20,10 @@ function cp(source, destination) {
 function exec(executable, ...args) {
   try {
     print(execFileSync(executable, args).toString());
+  } catch (err) {
+    console.error(err);
+    throw err;
   }
-  catch(err) {
-    console.error(err)
-    throw err
-  }
-  
 }
 
 function print(string) {
