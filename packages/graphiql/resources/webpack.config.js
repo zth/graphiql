@@ -117,7 +117,7 @@ if (process.env.ANALYZE) {
     new BundleAnalyzerPlugin({
       analyzerMode: 'static',
       openAnalyzer: false,
-      reportFilename: rootPath('coverage/analyzer/index.html'),
+      reportFilename: rootPath('analyzer.html'),
     })
   );
 }
