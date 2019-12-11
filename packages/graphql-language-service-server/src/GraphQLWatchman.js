@@ -21,8 +21,11 @@ export type WatchmanCommandResponse = {
 
 export class GraphQLWatchman {
   _client: watchman.Client;
-  constructor() {
+  _fileExtensions: $ReadOnlyArray<string>;
+
+  constructor(fileExtensions: $ReadOnlyArray<string>) {
     this._client = new watchman.Client();
+    this._fileExtensions = fileExtensions;
   }
 
   checkVersion(): Promise<void> {
@@ -55,7 +58,7 @@ export class GraphQLWatchman {
       expression: [
         'allof',
         ['type', 'f'],
-        ['anyof', ['match', '*.graphql'], ['match', '*.js']],
+        ['anyof', ...this._fileExtensions.map(ext => ['match', '*' + ext])],
         ['not', ['dirname', 'generated/relay']],
         ['not', ['match', '**/__flow__/**', 'wholename']],
         ['not', ['match', '**/__generated__/**', 'wholename']],
@@ -105,7 +108,10 @@ export class GraphQLWatchman {
     const { watch, relative_path } = await this.watchProject(entryPath);
 
     await this.runCommand('subscribe', watch, relative_path || watch, {
-      expression: ['allof', ['match', '*.graphql']],
+      expression: [
+        'allof',
+        ...this._fileExtensions.map(ext => ['match', '*' + ext]),
+      ],
       fields: ['name', 'exists', 'size', 'mtime'],
       relative_root: relative_path,
     });

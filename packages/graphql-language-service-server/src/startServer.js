@@ -40,13 +40,43 @@ import {
   ShutdownRequest,
 } from 'vscode-languageserver';
 
+import { Position, Range } from 'graphql-language-service-utils';
+
 import { Logger } from './Logger';
 
 type Options = {
   port?: number,
   method?: string,
   configDir?: string,
+  customServerConfig?: CustomServerConfig,
 };
+
+export type SingleFileExtensionConfig = {
+  // Returns whether file should be included for processing or not
+  fileFilter: (text: string) => boolean,
+
+  // Extracts GraphQL tags from document
+  findGraphQLTags: (
+    text: string
+  ) => Array<{ tag: string, template: string, range: Range }>,
+};
+
+export type FileExtensionsConfig = {
+  // .graphql, .js, .re...
+  [extension: string]: SingleFileExtensionConfig,
+};
+
+export type CustomServerConfig = {
+  fileExtensionsConfig?: FileExtensionsConfig,
+};
+
+function getFileExtensionsFromConfig(
+  fileExtensionsConfig?: FileExtensionsConfig
+): $ReadOnlyArray<string> {
+  return fileExtensionsConfig
+    ? Object.keys(fileExtensionsConfig)
+    : ['.js', '.graphql'];
+}
 
 export default (async function startServer(options: Options): Promise<void> {
   const logger = new Logger();
@@ -78,7 +108,7 @@ export default (async function startServer(options: Options): Promise<void> {
               process.exit(0);
             });
             const connection = createMessageConnection(reader, writer, logger);
-            addHandlers(connection, options.configDir, logger);
+            addHandlers(connection, options, logger);
             connection.listen();
           })
           .listen(port);
@@ -94,17 +124,26 @@ export default (async function startServer(options: Options): Promise<void> {
         break;
     }
     const connection = createMessageConnection(reader, writer, logger);
-    addHandlers(connection, options.configDir, logger);
+    addHandlers(connection, options, logger);
     connection.listen();
   }
 });
 
 function addHandlers(
   connection: MessageConnection,
-  configDir?: string,
+  options: Options,
   logger: Logger
 ): void {
-  const messageProcessor = new MessageProcessor(logger, new GraphQLWatchman());
+  const messageProcessor = new MessageProcessor(
+    logger,
+    new GraphQLWatchman(
+      getFileExtensionsFromConfig(
+        options.customServerConfig
+          ? options.customServerConfig.fileExtensionsConfig
+          : undefined
+      )
+    )
+  );
   connection.onNotification(
     DidOpenTextDocumentNotification.type,
     async params => {
@@ -162,7 +201,7 @@ function addHandlers(
   connection.onNotification('$/cancelRequest', () => ({}));
 
   connection.onRequest(InitializeRequest.type, (params, token) =>
-    messageProcessor.handleInitializeRequest(params, token, configDir)
+    messageProcessor.handleInitializeRequest(params, token, options.configDir)
   );
   connection.onRequest(CompletionRequest.type, params =>
     messageProcessor.handleCompletionRequest(params)

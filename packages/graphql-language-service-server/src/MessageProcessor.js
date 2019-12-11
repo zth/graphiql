@@ -51,6 +51,10 @@ import { getGraphQLCache } from './GraphQLCache';
 import { findGraphQLTags } from './findGraphQLTags';
 import { Logger } from './Logger';
 import { GraphQLWatchman } from './GraphQLWatchman';
+import type {
+  CustomServerConfig,
+  SingleFileExtensionConfig,
+} from './startServer';
 
 // Map { uri => { query, range } }
 
@@ -64,6 +68,7 @@ export class MessageProcessor {
   _languageService: GraphQLLanguageService;
   _textDocumentCache: Map<string, CachedDocumentType>;
   _watchmanClient: ?GraphQLWatchman;
+  _customServerConfig: CustomServerConfig | void;
 
   _isInitialized: boolean;
 
@@ -71,13 +76,18 @@ export class MessageProcessor {
 
   _logger: Logger;
 
-  constructor(logger: Logger, watchmanClient: GraphQLWatchman): void {
+  constructor(
+    logger: Logger,
+    watchmanClient: GraphQLWatchman,
+    customServerConfig?: CustomServerConfig
+  ): void {
     this._textDocumentCache = new Map();
     this._isInitialized = false;
     this._willShutdown = false;
 
     this._logger = logger;
     this._watchmanClient = watchmanClient;
+    this._customServerConfig = customServerConfig;
   }
 
   async handleInitializeRequest(
@@ -201,7 +211,7 @@ export class MessageProcessor {
     if (text || text === '') {
       // textDocument/didSave does not pass in the text content.
       // Only run the below function if text is passed in.
-      contents = getQueryAndRange(text, uri);
+      contents = getQueryAndRange(text, uri, this._customServerConfig);
       this._invalidateCache(textDocument, uri, contents);
     } else {
       const cachedDocument = this._getCachedDocument(uri);
@@ -268,7 +278,11 @@ export class MessageProcessor {
 
     // If it's a .js file, try parsing the contents to see if GraphQL queries
     // exist. If not found, delete from the cache.
-    const contents = getQueryAndRange(contentChange.text, uri);
+    const contents = getQueryAndRange(
+      contentChange.text,
+      uri,
+      this._customServerConfig
+    );
 
     // If it's a .graphql file, proceed normally and invalidate the cache.
     this._invalidateCache(textDocument, uri, contents);
@@ -482,24 +496,30 @@ export class MessageProcessor {
         ) {
           const uri = change.uri;
           const text: string = readFileSync(new URL(uri).pathname).toString();
-          const contents = getQueryAndRange(text, uri);
+          const contents = getQueryAndRange(
+            text,
+            uri,
+            this._customServerConfig
+          );
 
           this._updateFragmentDefinition(uri, contents);
           this._updateObjectTypeDefinition(uri, contents);
 
-          const diagnostics = (await Promise.all(
-            contents.map(async ({ query, range }) => {
-              const results = await this._languageService.getDiagnostics(
-                query,
-                uri
-              );
-              if (results && results.length > 0) {
-                return processDiagnosticsMessage(results, query, range);
-              } else {
-                return [];
-              }
-            })
-          )).reduce((left, right) => left.concat(right));
+          const diagnostics = (
+            await Promise.all(
+              contents.map(async ({ query, range }) => {
+                const results = await this._languageService.getDiagnostics(
+                  query,
+                  uri
+                );
+                if (results && results.length > 0) {
+                  return processDiagnosticsMessage(results, query, range);
+                } else {
+                  return [];
+                }
+              })
+            )
+          ).reduce((left, right) => left.concat(right));
 
           this._logger.log(
             JSON.stringify({
@@ -673,24 +693,46 @@ export class MessageProcessor {
  * Helper functions to perform requested services from client/server.
  */
 
+const defaultFileFilterRegexp = new RegExp(
+  /graphql`|graphql\.experimental`|gql`/g
+);
+
+function defaultFileFilter(text: string): boolean {
+  return defaultFileFilterRegexp.test(text);
+}
+
 // Check the uri to determine the file type (JavaScript/GraphQL).
 // If .js file, either return the parsed query/range or null if GraphQL queries
 // are not found.
 export function getQueryAndRange(
   text: string,
-  uri: string
+  uri: string,
+  customServerConfig?: CustomServerConfig
 ): Array<CachedContent> {
   // Check if the text content includes a GraphQLV query.
   // If the text doesn't include GraphQL queries, do not proceed.
-  if (extname(uri) === '.js') {
-    if (
-      text.indexOf('graphql`') === -1 &&
-      text.indexOf('graphql.experimental`') === -1 &&
-      text.indexOf('gql`') === -1
-    ) {
+  const extensions =
+    customServerConfig && customServerConfig.fileExtensionsConfig
+      ? Object.keys(customServerConfig.fileExtensionsConfig)
+      : ['.js'];
+
+  const currentExtensionName = extname(uri);
+
+  if (extensions.includes(currentExtensionName)) {
+    const fileExtensionConfig: SingleFileExtensionConfig =
+      customServerConfig &&
+      customServerConfig.fileExtensionsConfig &&
+      customServerConfig.fileExtensionsConfig[currentExtensionName]
+        ? customServerConfig.fileExtensionsConfig[currentExtensionName]
+        : {
+            fileFilter: defaultFileFilter,
+            findGraphQLTags,
+          };
+
+    if (!fileExtensionConfig.fileFilter(text)) {
       return [];
     }
-    const templates = findGraphQLTags(text);
+    const templates = fileExtensionConfig.findGraphQLTags(text);
     return templates.map(({ template, range }) => ({ query: template, range }));
   } else {
     const query = text;
