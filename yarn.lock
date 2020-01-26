@@ -440,7 +440,7 @@
     resolve "^1.13.1"
     v8flags "^3.1.1"
 
-"@babel/parser@^7.0.0", "@babel/parser@^7.1.0", "@babel/parser@^7.4.3", "@babel/parser@^7.7.4", "@babel/parser@^7.7.5", "@babel/parser@^7.8.3":
+"@babel/parser@^7.0.0", "@babel/parser@^7.1.0", "@babel/parser@^7.4.3", "@babel/parser@^7.4.5", "@babel/parser@^7.7.4", "@babel/parser@^7.7.5", "@babel/parser@^7.8.3":
   version "7.8.3"
   resolved "https://registry.yarnpkg.com/@babel/parser/-/parser-7.8.3.tgz#790874091d2001c9be6ec426c2eed47bc7679081"
   integrity sha512-/V72F4Yp/qmHaTALizEm9Gf2eQHV3QyTL3K0cNfijwnMnb1L+LDlAubb/ZnSdGAVzVSWakujHYs1I26x66sMeQ==
@@ -8597,6 +8597,21 @@ graphql-import@^0.7.1:
   dependencies:
     lodash "^4.17.4"
     resolve-from "^4.0.0"
+
+graphql-language-service-server@^2.4.0-alpha.1:
+  version "2.4.0-alpha.1"
+  resolved "https://registry.yarnpkg.com/graphql-language-service-server/-/graphql-language-service-server-2.4.0-alpha.1.tgz#a7114d48fcd09664d65dc6efc8e24b3237ee683f"
+  integrity sha512-uVI9N+fo8Di/VrpFjkcoX+OldUfY+OREDOXJpLfh7KJUIQe6tfah0AoONo6pvHM5PtA4QdEHBkeHdj95qTDL7g==
+  dependencies:
+    "@babel/parser" "^7.4.5"
+    glob "^7.1.2"
+    graphql-config "2.2.1"
+    graphql-language-service-interface "^2.4.0-alpha.1"
+    graphql-language-service-types "^1.6.0-alpha.1"
+    graphql-language-service-utils "^2.4.0-alpha.1"
+    nullthrows "^1.0.0"
+    vscode-jsonrpc "^4.0.0"
+    vscode-languageserver "^5.2.1"
 
 graphql-request@^1.5.0:
   version "1.8.2"
