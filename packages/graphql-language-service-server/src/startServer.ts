@@ -42,6 +42,7 @@ import {
 
 import { GraphQLConfig } from 'graphql-config';
 import { Logger } from './Logger';
+import { GraphQLConfig } from 'graphql-config';
 
 type Options = {
   // port for the LSP server to run on
