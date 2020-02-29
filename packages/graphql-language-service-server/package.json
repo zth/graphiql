@@ -1,6 +1,6 @@
 {
   "name": "@gabnor/graphql-language-service-server",
-  "version": "2.4.0-alpha.2",
+  "version": "2.4.0-alpha.3",
   "description": "Server process backing the GraphQL Language Service",
   "contributors": [
     "Greg Hurrell <greg@hurrell.net> (https://greg.hurrell.net/)",
