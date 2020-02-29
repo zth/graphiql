@@ -41,6 +41,7 @@ import {
 } from 'vscode-languageserver';
 
 import { Logger } from './Logger';
+import { GraphQLConfig } from 'graphql-config';
 
 type Options = {
   // port for the LSP server to run on
@@ -49,6 +50,8 @@ type Options = {
   method?: 'socket' | 'stream' | 'node';
   // the directory where graphql-config is found
   configDir?: string;
+  // pre-existing GraphQL config
+  config?: GraphQLConfig;
 };
 
 /**
@@ -86,7 +89,7 @@ export default async function startServer(options: Options): Promise<void> {
               process.exit(0);
             });
             const connection = createMessageConnection(reader, writer, logger);
-            addHandlers(connection, logger, options.configDir);
+            addHandlers(connection, logger, options.configDir, options.config);
             connection.listen();
           })
           .listen(port);
@@ -111,8 +114,9 @@ function addHandlers(
   connection: MessageConnection,
   logger: Logger,
   configDir?: string,
+  config?: GraphQLConfig,
 ): void {
-  const messageProcessor = new MessageProcessor(logger);
+  const messageProcessor = new MessageProcessor(logger, config);
   connection.onNotification(
     DidOpenTextDocumentNotification.type,
     async params => {

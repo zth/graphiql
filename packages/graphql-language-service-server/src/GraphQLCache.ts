@@ -54,8 +54,9 @@ const {
 
 export async function getGraphQLCache(
   configDir: Uri,
+  config?: GraphQLConfig,
 ): Promise<GraphQLCacheInterface> {
-  const graphQLConfig = await loadConfig({ rootDir: configDir });
+  const graphQLConfig = config || (await loadConfig({ rootDir: configDir }));
   return new GraphQLCache(configDir, graphQLConfig);
 }
 
