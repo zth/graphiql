@@ -7,13 +7,21 @@
  *
  */
 
+jest.mock('cross-fetch', () => ({
+  fetch: require('fetch-mock').fetchHandler,
+}));
 import { GraphQLSchema } from 'graphql/type';
 import { parse } from 'graphql/language';
-import { getGraphQLConfig } from 'graphql-config';
+import { loadConfig } from 'graphql-config';
 import fetchMock from 'fetch-mock';
-
+import {
+  introspectionFromSchema,
+  FragmentDefinitionNode,
+  TypeDefinitionNode,
+} from 'graphql';
 import { GraphQLCache } from '../GraphQLCache';
 import { getQueryAndRange } from '../MessageProcessor';
+import { FragmentInfo, ObjectTypeInfo } from 'graphql-language-service-types';
 
 function wihtoutASTNode(definition: any) {
   const result = { ...definition };
@@ -23,11 +31,11 @@ function wihtoutASTNode(definition: any) {
 
 describe('GraphQLCache', () => {
   const configDir = __dirname;
-  let graphQLRC = getGraphQLConfig(configDir);
+  let graphQLRC;
   let cache = new GraphQLCache(configDir, graphQLRC);
 
   beforeEach(async () => {
-    graphQLRC = getGraphQLConfig(configDir);
+    graphQLRC = await loadConfig({ rootDir: configDir });
     cache = new GraphQLCache(configDir, graphQLRC);
   });
 
@@ -42,9 +50,12 @@ describe('GraphQLCache', () => {
     });
 
     it('generates the schema correctly from endpoint', async () => {
-      const introspectionResult = await graphQLRC
-        .getProjectConfig('testWithSchema')
-        .resolveIntrospection();
+      const introspectionResult = {
+        data: introspectionFromSchema(
+          await graphQLRC.getProject('testWithSchema').getSchema(),
+          { descriptions: true },
+        ),
+      };
       fetchMock.mock({
         matcher: '*',
         response: {
@@ -56,17 +67,6 @@ describe('GraphQLCache', () => {
       });
 
       const schema = await cache.getSchema('testWithEndpoint');
-      expect(fetchMock.called('*')).toEqual(true);
-      expect(schema instanceof GraphQLSchema).toEqual(true);
-    });
-
-    it('falls through to schema on disk if endpoint fails', async () => {
-      fetchMock.mock({
-        matcher: '*',
-        response: 500,
-      });
-
-      const schema = await cache.getSchema('testWithEndpointAndSchema');
       expect(fetchMock.called('*')).toEqual(true);
       expect(schema instanceof GraphQLSchema).toEqual(true);
     });
@@ -123,17 +123,17 @@ describe('GraphQLCache', () => {
 
     const catDefinition = parse(catContent).definitions[0];
 
-    const fragmentDefinitions = new Map();
+    const fragmentDefinitions = new Map<string, FragmentInfo>();
     fragmentDefinitions.set('Duck', {
       file: 'someFilePath',
       content: duckContent,
       definition: duckDefinition,
-    });
+    } as FragmentInfo);
     fragmentDefinitions.set('Cat', {
       file: 'someOtherFilePath',
       content: catContent,
-      definition: catDefinition,
-    });
+      definition: catDefinition as FragmentDefinitionNode,
+    } as FragmentInfo);
 
     it('finds fragments referenced in Relay queries', async () => {
       const text =
@@ -166,25 +166,25 @@ describe('GraphQLCache', () => {
 
   describe('getFragmentDefinitions', () => {
     it('it caches fragments found through single glob in `includes`', async () => {
-      const config = graphQLRC.getProjectConfig('testSingularIncludesGlob');
+      const config = graphQLRC.getProject('testSingularIncludesGlob');
       const fragmentDefinitions = await cache.getFragmentDefinitions(config);
       expect(fragmentDefinitions.get('testFragment')).not.toBeUndefined();
     });
 
     it('it caches fragments found through multiple globs in `includes`', async () => {
-      const config = graphQLRC.getProjectConfig('testMultipleIncludes');
+      const config = graphQLRC.getProject('testMultipleIncludes');
       const fragmentDefinitions = await cache.getFragmentDefinitions(config);
       expect(fragmentDefinitions.get('testFragment')).not.toBeUndefined();
     });
 
     it('handles empty includes', async () => {
-      const config = graphQLRC.getProjectConfig('testNoIncludes');
+      const config = graphQLRC.getProject('testNoIncludes');
       const fragmentDefinitions = await cache.getFragmentDefinitions(config);
       expect(fragmentDefinitions.get('testFragment')).toBeUndefined();
     });
 
     it('handles non-existent includes', async () => {
-      const config = graphQLRC.getProjectConfig('testBadIncludes');
+      const config = graphQLRC.getProject('testBadIncludes');
       const fragmentDefinitions = await cache.getFragmentDefinitions(config);
       expect(fragmentDefinitions.get('testFragment')).toBeUndefined();
     });
@@ -201,7 +201,7 @@ describe('GraphQLCache', () => {
       `;
     const parsedQuery = parse(query);
 
-    const namedTypeDefinitions = new Map();
+    const namedTypeDefinitions = new Map<string, ObjectTypeInfo>();
     namedTypeDefinitions.set('Character', {
       file: 'someOtherFilePath',
       content: query,
@@ -215,8 +215,8 @@ describe('GraphQLCache', () => {
           start: 0,
           end: 0,
         },
-      },
-    });
+      } as TypeDefinitionNode,
+    } as ObjectTypeInfo);
 
     it('finds named types referenced from the SDL', async () => {
       const result = await cache.getObjectTypeDependenciesForAST(

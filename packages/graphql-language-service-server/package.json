@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "glob": "^7.1.2",
-    "graphql-config": "2.2.1",
+    "graphql-config": "3.0.0-alpha.17",
     "graphql-language-service-interface": "^2.4.0-alpha.1",
     "graphql-language-service-types": "^1.6.0-alpha.1",
     "graphql-language-service-utils": "^2.4.0-alpha.1",
@@ -37,6 +37,6 @@
     "vscode-languageserver": "^5.2.1"
   },
   "devDependencies": {
-    "cross-env": "^6.0.3"
+    "cross-env": "^7.0.0"
   }
 }

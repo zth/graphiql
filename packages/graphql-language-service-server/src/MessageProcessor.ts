@@ -7,16 +7,16 @@
  *
  */
 
-import { extname, dirname } from 'path';
+import { extname } from 'path';
 import { readFileSync } from 'fs';
 import { URL } from 'url';
-import { findGraphQLConfigFile } from 'graphql-config';
 
 import {
   CachedContent,
   GraphQLCache,
   Uri,
   FileChangeTypeKind,
+  DefinitionQueryResult,
 } from 'graphql-language-service-types';
 
 import { GraphQLLanguageService } from 'graphql-language-service-interface';
@@ -46,6 +46,8 @@ import {
   InitializeParams,
   Range as RangeType,
   TextDocumentPositionParams,
+  DocumentSymbolParams,
+  SymbolInformation,
 } from 'vscode-languageserver';
 
 import { getGraphQLCache } from './GraphQLCache';
@@ -57,6 +59,13 @@ type CachedDocumentType = {
   version: number;
   contents: CachedContent[];
 };
+
+// const KIND_TO_SYMBOL_KIND = {
+//   Field: SymbolKind.Field,
+//   OperationDefinition: SymbolKind.Class,
+//   FragmentDefinition: SymbolKind.Class,
+//   FragmentSpread: SymbolKind.Struct,
+// };
 
 export class MessageProcessor {
   _graphQLCache!: GraphQLCache;
@@ -74,7 +83,6 @@ export class MessageProcessor {
     this._textDocumentCache = new Map();
     this._isInitialized = false;
     this._willShutdown = false;
-
     this._logger = logger;
     this._graphQLConfig = config;
   }
@@ -90,6 +98,8 @@ export class MessageProcessor {
 
     const serverCapabilities: InitializeResult = {
       capabilities: {
+        workspaceSymbolProvider: true,
+        documentSymbolProvider: true,
         completionProvider: { resolveProvider: true },
         definitionProvider: true,
         textDocumentSync: 1,
@@ -97,11 +107,7 @@ export class MessageProcessor {
       },
     };
 
-    const rootPath = dirname(
-      findGraphQLConfigFile(
-        configDir ? configDir.trim() : (params.rootPath as string),
-      ),
-    );
+    const rootPath = configDir ? configDir.trim() : params.rootPath;
     if (!rootPath) {
       throw new Error(
         '`--configDir` option or `rootPath` argument is required.',
@@ -130,7 +136,7 @@ export class MessageProcessor {
   async handleDidOpenOrSaveNotification(
     params: DidSaveTextDocumentParams | DidOpenTextDocumentParams,
   ): Promise<PublishDiagnosticsParams | null> {
-    if (!this._isInitialized) {
+    if (!this._isInitialized || !this._graphQLCache) {
       return null;
     }
 
@@ -170,13 +176,15 @@ export class MessageProcessor {
       }),
     );
 
+    const project = this._graphQLCache
+      .getGraphQLConfig()
+      .getProjectForFile(uri);
+
     this._logger.log(
       JSON.stringify({
         type: 'usage',
         messageType: 'textDocument/didOpen',
-        projectName: this._graphQLCache
-          .getGraphQLConfig()
-          .getProjectNameForFile(uri),
+        projectName: project && project.name,
         fileName: uri,
       }),
     );
@@ -187,7 +195,7 @@ export class MessageProcessor {
   async handleDidChangeNotification(
     params: DidChangeTextDocumentParams,
   ): Promise<PublishDiagnosticsParams | null> {
-    if (!this._isInitialized) {
+    if (!this._isInitialized || !this._graphQLCache) {
       return null;
     }
     // For every `textDocument/didChange` event, keep a cache of textDocuments
@@ -239,13 +247,15 @@ export class MessageProcessor {
       }),
     );
 
+    const project = this._graphQLCache
+      .getGraphQLConfig()
+      .getProjectForFile(uri);
+
     this._logger.log(
       JSON.stringify({
         type: 'usage',
         messageType: 'textDocument/didChange',
-        projectName: this._graphQLCache
-          .getGraphQLConfig()
-          .getProjectNameForFile(uri),
+        projectName: project && project.name,
         fileName: uri,
       }),
     );
@@ -254,7 +264,7 @@ export class MessageProcessor {
   }
 
   handleDidCloseNotification(params: DidCloseTextDocumentParams): void {
-    if (!this._isInitialized) {
+    if (!this._isInitialized || !this._graphQLCache) {
       return;
     }
     // For every `textDocument/didClose` event, delete the cached entry.
@@ -270,13 +280,15 @@ export class MessageProcessor {
       this._textDocumentCache.delete(uri);
     }
 
+    const project = this._graphQLCache
+      .getGraphQLConfig()
+      .getProjectForFile(uri);
+
     this._logger.log(
       JSON.stringify({
         type: 'usage',
         messageType: 'textDocument/didClose',
-        projectName: this._graphQLCache
-          .getGraphQLConfig()
-          .getProjectNameForFile(uri),
+        projectName: project && project.name,
         fileName: uri,
       }),
     );
@@ -307,7 +319,7 @@ export class MessageProcessor {
   async handleCompletionRequest(
     params: CompletionParams,
   ): Promise<CompletionList | Array<CompletionItem>> {
-    if (!this._isInitialized) {
+    if (!this._isInitialized || !this._graphQLCache) {
       return [];
     }
 
@@ -349,13 +361,15 @@ export class MessageProcessor {
       textDocument.uri,
     );
 
+    const project = this._graphQLCache
+      .getGraphQLConfig()
+      .getProjectForFile(textDocument.uri);
+
     this._logger.log(
       JSON.stringify({
         type: 'usage',
         messageType: 'textDocument/completion',
-        projectName: this._graphQLCache
-          .getGraphQLConfig()
-          .getProjectNameForFile(textDocument.uri),
+        projectName: project && project.name,
         fileName: textDocument.uri,
       }),
     );
@@ -364,7 +378,7 @@ export class MessageProcessor {
   }
 
   async handleHoverRequest(params: TextDocumentPositionParams): Promise<Hover> {
-    if (!this._isInitialized) {
+    if (!this._isInitialized || this._graphQLCache) {
       return { contents: [] };
     }
 
@@ -409,12 +423,16 @@ export class MessageProcessor {
   async handleWatchedFilesChangedNotification(
     params: DidChangeWatchedFilesParams,
   ): Promise<Array<PublishDiagnosticsParams | undefined> | null> {
-    if (!this._isInitialized) {
+    if (!this._isInitialized || !this._graphQLCache) {
       return null;
     }
 
     return Promise.all(
       params.changes.map(async (change: FileEvent) => {
+        if (!this._isInitialized || !this._graphQLCache) {
+          throw Error('No cache available for handleWatchedFilesChanged');
+        }
+
         if (
           change.type === FileChangeTypeKind.Created ||
           change.type === FileChangeTypeKind.Changed
@@ -442,13 +460,15 @@ export class MessageProcessor {
             )
           ).reduce((left, right) => left.concat(right));
 
+          const project = this._graphQLCache
+            .getGraphQLConfig()
+            .getProjectForFile(uri);
+
           this._logger.log(
             JSON.stringify({
               type: 'usage',
               messageType: 'workspace/didChangeWatchedFiles',
-              projectName: this._graphQLCache
-                .getGraphQLConfig()
-                .getProjectNameForFile(uri),
+              projectName: project && project.name,
               fileName: uri,
             }),
           );
@@ -456,12 +476,12 @@ export class MessageProcessor {
           return { uri, diagnostics };
         } else if (change.type === FileChangeTypeKind.Deleted) {
           this._graphQLCache.updateFragmentDefinitionCache(
-            this._graphQLCache.getGraphQLConfig().configDir,
+            this._graphQLCache.getGraphQLConfig().dirpath,
             change.uri,
             false,
           );
           this._graphQLCache.updateObjectTypeDefinitionCache(
-            this._graphQLCache.getGraphQLConfig().configDir,
+            this._graphQLCache.getGraphQLConfig().dirpath,
             change.uri,
             false,
           );
@@ -474,7 +494,7 @@ export class MessageProcessor {
     params: TextDocumentPositionParams,
     _token?: CancellationToken,
   ): Promise<Array<Location>> {
-    if (!this._isInitialized) {
+    if (!this._isInitialized || !this._graphQLCache) {
       return [];
     }
 
@@ -505,7 +525,7 @@ export class MessageProcessor {
     if (range) {
       position.line -= range.start.line;
     }
-    const result = await this._languageService.getDefinition(
+    const result: DefinitionQueryResult | null = await this._languageService.getDefinition(
       query,
       position,
       textDocument.uri,
@@ -529,18 +549,63 @@ export class MessageProcessor {
         })
       : [];
 
+    const project = this._graphQLCache
+      .getGraphQLConfig()
+      .getProjectForFile(textDocument.uri);
+
     this._logger.log(
       JSON.stringify({
         type: 'usage',
         messageType: 'textDocument/definition',
-        projectName: this._graphQLCache
-          .getGraphQLConfig()
-          .getProjectNameForFile(textDocument.uri),
+        projectName: project && project.name,
         fileName: textDocument.uri,
       }),
     );
     return formatted;
   }
+
+  async handleDocumentSymbolRequest(
+    params: DocumentSymbolParams,
+  ): Promise<Array<SymbolInformation>> {
+    if (!this._isInitialized) {
+      return [];
+    }
+
+    if (!params || !params.textDocument) {
+      throw new Error('`textDocument` argument is required.');
+    }
+
+    const textDocument = params.textDocument;
+    const cachedDocument = this._getCachedDocument(textDocument.uri);
+    if (!cachedDocument) {
+      throw new Error('A cached document cannot be found.');
+    }
+    return this._languageService.getDocumentSymbols(
+      cachedDocument.contents[0].query,
+      textDocument.uri,
+    );
+  }
+
+  // async handleReferencesRequest(params: ReferenceParams): Promise<Location[]> {
+  //    if (!this._isInitialized) {
+  //      return [];
+  //    }
+
+  //    if (!params || !params.textDocument) {
+  //      throw new Error('`textDocument` argument is required.');
+  //    }
+
+  //    const textDocument = params.textDocument;
+  //    const cachedDocument = this._getCachedDocument(textDocument.uri);
+  //    if (!cachedDocument) {
+  //      throw new Error('A cached document cannot be found.');
+  //    }
+  //    return this._languageService.getReferences(
+  //      cachedDocument.contents[0].query,
+  //      params.position,
+  //      textDocument.uri,
+  //    );
+  // }
 
   _isRelayCompatMode(query: string): boolean {
     return (
@@ -553,7 +618,7 @@ export class MessageProcessor {
     uri: Uri,
     contents: CachedContent[],
   ): Promise<void> {
-    const rootDir = this._graphQLCache.getGraphQLConfig().configDir;
+    const rootDir = this._graphQLCache.getGraphQLConfig().dirpath;
 
     await this._graphQLCache.updateFragmentDefinition(
       rootDir,
@@ -566,7 +631,7 @@ export class MessageProcessor {
     uri: Uri,
     contents: CachedContent[],
   ): Promise<void> {
-    const rootDir = this._graphQLCache.getGraphQLConfig().configDir;
+    const rootDir = this._graphQLCache.getGraphQLConfig().dirpath;
 
     await this._graphQLCache.updateObjectTypeDefinition(
       rootDir,
